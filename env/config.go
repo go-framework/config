@@ -1,4 +1,4 @@
-package environment
+package env
 
 import (
 	"bytes"
@@ -6,6 +6,7 @@ import (
 	"fmt"
 )
 
+// Defined Environment as int8.
 type Environment int8
 
 const (
@@ -55,13 +56,13 @@ func (env *Environment) UnmarshalText(text []byte) error {
 
 func (env *Environment) unmarshalText(text []byte) bool {
 	switch string(text) {
-	case "development", "": // make the zero value useful
+	case "development", "dev", "debug", "": // make the zero value useful
 		*env = Development
-	case "testing":
+	case "testing", "test":
 		*env = Testing
-	case "pre-production":
+	case "pre-production", "pre-prod", "pre-release":
 		*env = PreProduction
-	case "production":
+	case "production", "prod", "release":
 		*env = Production
 	default:
 		return false

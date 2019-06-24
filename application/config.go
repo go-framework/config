@@ -2,8 +2,8 @@ package application
 
 // Application config.
 type Config struct {
-	// application name.
+	// Application name.
 	Name string `json:"name" yaml:"name"`
-	// application label.
+	// Application label.
 	Label []string `json:"label" yaml:"label"`
 }

@@ -2,8 +2,8 @@ package debugger
 
 // Debugger config.
 type Config struct {
-	// debugger enabled.
+	// Debugger enabled.
 	Enabled bool `json:"enabled" yaml:"enabled"`
-	// debug items.
+	// Debug items.
 	Object map[string]bool `json:"object" yaml:"object"`
 }

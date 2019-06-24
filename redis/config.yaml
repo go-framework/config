@@ -1,0 +1,14 @@
+# redis config
+
+# network type, either tcp or unix.
+network: tcp
+# host:port address.
+addr: 127.0.0.1:6379
+# database
+db: 0
+# optional password.
+password:
+
+
+
+

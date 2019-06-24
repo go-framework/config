@@ -62,4 +62,7 @@ type Config struct {
 	// but idle connections are still discarded by the client
 	// if IdleTimeout is set.
 	IdleCheckFrequency time.Duration `json:"idle_check_frequency" yaml:"idle_check_frequency"`
+
+	// register update func when self updated.
+	updateFunc []func(*Config)
 }
