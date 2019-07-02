@@ -18,9 +18,10 @@ type Config1 struct {
 
 func TestRegistry(t *testing.T) {
 	c0 := new(Config0)
-
 	c1 := new(Config1)
+	c2 := new(Config1)
 
+	registry.RegisterAfter("config2", c2, "config0")
 	registry.Register("config0", c0)
 	registry.Register("config1", c1)
 
@@ -31,6 +32,9 @@ func TestRegistry(t *testing.T) {
 		t.Fatal(err)
 	}
 
+
 	t.Log("config0", c0)
 	t.Log("config1", c1)
+	t.Log("config2", c2)
+
 }

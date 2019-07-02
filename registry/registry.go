@@ -1,11 +1,11 @@
 package registry
 
 import (
+	"container/list"
 	"fmt"
 	"io/ioutil"
 	"path"
 	"strings"
-	"sync"
 
 	"github.com/json-iterator/go"
 	"gopkg.in/yaml.v3"
@@ -13,62 +13,118 @@ import (
 	"github.com/go-framework/errors"
 )
 
+// list node.
+type node struct {
+	name   string
+	config interface{}
+}
+
 // Defined Registry interface.
 type Registry struct {
-	configs sync.Map
+	l *list.List
 }
 
 // New Registry.
 func NewRegistry() *Registry {
-	return &Registry{}
+	return &Registry{
+		l: list.New(),
+	}
 }
 
 // Register Config interface.
 // parse every register config base of file.
-func (r *Registry) Register(key string, config interface{}) {
-	r.configs.Store(key, config)
+func (r *Registry) Register(name string, config interface{}) {
+	// replace one
+	for e := r.l.Front(); e != nil; e = e.Next() {
+		if n, ok := e.Value.(*node); ok {
+			if n.name == name {
+				n.config = config
+				return
+			}
+		}
+	}
+
+	// push new
+	r.l.PushBack(&node{
+		name:   name,
+		config: config,
+	})
+}
+
+// Register Config interface, parsed name's config after after's config.
+// parse every register config base of file.
+func (r *Registry) RegisterAfter(name string, config interface{}, after string) {
+	var selected *list.Element
+
+	// find after
+	for e := r.l.Front(); e != nil; e = e.Next() {
+		if n, ok := e.Value.(*node); ok {
+			if n.name == after {
+				selected = e
+				break
+			}
+		}
+	}
+
+	// not find than push new one
+	if selected == nil {
+		selected = r.l.PushBack(&node{
+			name: after,
+		})
+	}
+
+	// new one push after
+	r.l.InsertAfter(&node{
+		name:   name,
+		config: config,
+	}, selected)
 }
 
 // Get config with key, when not exist return nil.
-func (r Registry) Get(key string) interface{} {
-	config, _ := r.configs.Load(key)
+func (r Registry) Get(name string) interface{} {
+	// find after
+	for e := r.l.Front(); e != nil; e = e.Next() {
+		if n, ok := e.Value.(*node); ok {
+			if n.name == name {
+				return n.config
+			}
+		}
+	}
 
-	return config
+	return nil
 }
 
 // Parse data.
 // parse every register config base of file.
 func (r *Registry) ParseData(data []byte, ext string) (errs error) {
 
-	// range map
-	r.configs.Range(func(key, value interface{}) bool {
+	// range
+	for e := r.l.Front(); e != nil; e = e.Next() {
+		if n, ok := e.Value.(*node); ok {
+			switch ext {
+			case ".json":
+				if err := jsoniter.Unmarshal(data, n.config); err != nil {
+					errs = errors.Append(errs, err)
+					continue
+				}
+			case ".yaml", ".yml":
+				if err := yaml.Unmarshal(data, n.config); err != nil {
+					errs = errors.Append(errs, err)
+					continue
+				}
+			default:
+				errs = errors.Append(errs, fmt.Errorf("unsupported config file extension: %s", ext))
+				continue
+			}
 
-		switch ext {
-		case ".json":
-			if err := jsoniter.Unmarshal(data, value); err != nil {
-				errs = errors.Append(errs, err)
-				return true
+			if inter, ok := n.config.(Config); ok {
+				if err := inter.Update(); err != nil {
+					errs = errors.Append(errs, err)
+				}
 			}
-		case ".yaml", ".yml":
-			if err := yaml.Unmarshal(data, value); err != nil {
-				errs = errors.Append(errs, err)
-				return true
-			}
-		default:
-			errs = errors.Append(errs, fmt.Errorf("unsupported config file extension: %s", ext))
-			return true
+
 		}
-
-		if inter, ok := value.(Config); ok {
-			if err := inter.Update(); err != nil {
-				errs = errors.Append(errs, err)
-				return true
-			}
-		}
-
-		return true
-	})
-
+	}
 	return
 }
 
@@ -100,45 +156,53 @@ func (r *Registry) ParseFiles(files ...string) (errs error) {
 // Implement YAML Unmarshaler interface.
 func (r *Registry) UnmarshalYAML(unmarshal func(interface{}) error) (errs error) {
 
-	// range map
-	r.configs.Range(func(key, value interface{}) bool {
-		if err := unmarshal(value); err != nil {
-			errs = errors.Append(errs, err)
+	// range
+	for e := r.l.Front(); e != nil; e = e.Next() {
+		if n, ok := e.Value.(*node); ok {
+			if err := unmarshal(n.config); err != nil {
+				errs = errors.Append(errs, err)
+			}
 		}
-
-		return true
-	})
+	}
 
 	return
 }
 
 // Implement JSON Unmarshaler interface.
 func (r *Registry) UnmarshalJSON(data []byte) (errs error) {
-
-	// range map
-	r.configs.Range(func(key, value interface{}) bool {
-		if err := jsoniter.Unmarshal(data, value); err != nil {
-			errs = errors.Append(errs, err)
+	// range
+	for e := r.l.Front(); e != nil; e = e.Next() {
+		if n, ok := e.Value.(*node); ok {
+			if err := jsoniter.Unmarshal(data, n.config); err != nil {
+				errs = errors.Append(errs, err)
+			}
 		}
-		return true
-	})
+	}
 
 	return
 }
 
+//
+// default
+//
 var (
 	// global Registry.
 	defaultRegistry *Registry = NewRegistry()
 )
 
 // Register Config interface.
-func Register(key string, config interface{}) {
-	defaultRegistry.Register(key, config)
+func Register(name string, config interface{}) {
+	defaultRegistry.Register(name, config)
+}
+
+// Register Config interface.
+func RegisterAfter(name string, config interface{}, after string) {
+	defaultRegistry.RegisterAfter(name, config, after)
 }
 
 // Get config with key, when not exist return nil.
-func Get(key string) interface{} {
-	return defaultRegistry.Get(key)
+func Get(name string) interface{} {
+	return defaultRegistry.Get(name)
 }
 
 // Parse data.
