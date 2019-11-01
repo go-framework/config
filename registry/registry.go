@@ -15,7 +15,7 @@ import (
 
 // Callback interface.
 type ICallback interface {
-	Callback(config interface{})
+	Callback(config interface{}) error
 }
 
 // list node.
@@ -144,14 +144,18 @@ func (r *Registry) ParseData(data []byte, ext string) (errs error) {
 				continue
 			}
 
+			// update
 			if inter, ok := n.config.(Config); ok {
 				if err := inter.Update(); err != nil {
 					errs = errors.Append(errs, err)
 				}
 			}
 
+			// exec callbacks
 			for i := 0; i < len(n.callbacks); i++ {
-				n.callbacks[i].Callback(n)
+				if err := n.callbacks[i].Callback(n); err != nil {
+					errs = errors.Append(errs, err)
+				}
 			}
 
 		}
