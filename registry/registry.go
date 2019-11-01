@@ -128,6 +128,12 @@ func (r *Registry) ParseData(data []byte, ext string) (errs error) {
 	// range
 	for e := r.l.Front(); e != nil; e = e.Next() {
 		if n, ok := e.Value.(*node); ok {
+
+			// check config is nil?
+			if n.config == nil {
+				continue
+			}
+
 			switch ext {
 			case ".json":
 				if err := jsoniter.Unmarshal(data, n.config); err != nil {
@@ -153,7 +159,7 @@ func (r *Registry) ParseData(data []byte, ext string) (errs error) {
 
 			// exec callbacks
 			for i := 0; i < len(n.callbacks); i++ {
-				if err := n.callbacks[i].Callback(n); err != nil {
+				if err := n.callbacks[i].Callback(n.config); err != nil {
 					errs = errors.Append(errs, err)
 				}
 			}
