@@ -224,6 +224,11 @@ func Register(name string, config interface{}) {
 	defaultRegistry.Register(name, config)
 }
 
+// Register Callback in name.
+func RegisterCallback(name string, callbacks ...Callback) {
+	defaultRegistry.RegisterCallback(name, callbacks...)
+}
+
 // Register Config interface.
 func RegisterAfter(name string, config interface{}, after string) {
 	defaultRegistry.RegisterAfter(name, config, after)
