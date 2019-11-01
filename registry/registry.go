@@ -13,14 +13,16 @@ import (
 	"github.com/go-framework/errors"
 )
 
-// Config callback.
-type Callback func(config interface{})
+// Callback interface.
+type ICallback interface {
+	Callback(config interface{})
+}
 
 // list node.
 type node struct {
 	name      string
 	config    interface{}
-	callbacks []Callback
+	callbacks []ICallback
 }
 
 // Defined Registry interface.
@@ -37,7 +39,7 @@ func NewRegistry() *Registry {
 
 // Register Config interface.
 // parse every register config base of file.
-func (r *Registry) Register(name string, config interface{}, callbacks ...Callback) {
+func (r *Registry) Register(name string, config interface{}, callbacks ...ICallback) {
 	// replace one
 	for e := r.l.Front(); e != nil; e = e.Next() {
 		if n, ok := e.Value.(*node); ok {
@@ -58,7 +60,7 @@ func (r *Registry) Register(name string, config interface{}, callbacks ...Callba
 }
 
 // Register Config callback.
-func (r *Registry) RegisterCallback(name string, callbacks ...Callback) {
+func (r *Registry) RegisterCallback(name string, callbacks ...ICallback) {
 	// replace one
 	for e := r.l.Front(); e != nil; e = e.Next() {
 		if n, ok := e.Value.(*node); ok {
@@ -149,7 +151,7 @@ func (r *Registry) ParseData(data []byte, ext string) (errs error) {
 			}
 
 			for i := 0; i < len(n.callbacks); i++ {
-				n.callbacks[i](n)
+				n.callbacks[i].Callback(n)
 			}
 
 		}
@@ -225,7 +227,7 @@ func Register(name string, config interface{}) {
 }
 
 // Register Callback in name.
-func RegisterCallback(name string, callbacks ...Callback) {
+func RegisterCallback(name string, callbacks ...ICallback) {
 	defaultRegistry.RegisterCallback(name, callbacks...)
 }
 
