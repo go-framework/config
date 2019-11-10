@@ -15,13 +15,13 @@ import (
 
 // Callback interface.
 type ICallback interface {
-	Callback(config interface{}) error
+	Callback() error
 }
 
 // list node.
 type node struct {
 	name      string
-	config    interface{}
+	configs   []interface{}
 	callbacks []ICallback
 }
 
@@ -44,7 +44,7 @@ func (r *Registry) Register(name string, config interface{}, callbacks ...ICallb
 	for e := r.l.Front(); e != nil; e = e.Next() {
 		if n, ok := e.Value.(*node); ok {
 			if n.name == name {
-				n.config = config
+				n.configs = append(n.configs, config)
 				n.callbacks = append(n.callbacks, callbacks...)
 				return
 			}
@@ -54,7 +54,7 @@ func (r *Registry) Register(name string, config interface{}, callbacks ...ICallb
 	// push new
 	r.l.PushBack(&node{
 		name:      name,
-		config:    config,
+		configs:   []interface{}{config},
 		callbacks: callbacks,
 	})
 }
@@ -102,18 +102,18 @@ func (r *Registry) RegisterAfter(name string, config interface{}, after string) 
 
 	// new one push after
 	r.l.InsertAfter(&node{
-		name:   name,
-		config: config,
+		name:    name,
+		configs: []interface{}{config},
 	}, selected)
 }
 
 // Get config with key, when not exist return nil.
-func (r Registry) Get(name string) interface{} {
+func (r Registry) Get(name string) []interface{} {
 	// find after
 	for e := r.l.Front(); e != nil; e = e.Next() {
 		if n, ok := e.Value.(*node); ok {
 			if n.name == name {
-				return n.config
+				return n.configs
 			}
 		}
 	}
@@ -129,43 +129,46 @@ func (r *Registry) ParseData(data []byte, ext string) (errs error) {
 	for e := r.l.Front(); e != nil; e = e.Next() {
 		if n, ok := e.Value.(*node); ok {
 
-			// check config is nil?
-			if n.config == nil {
+			// check config is 0?
+			if len(n.configs) == 0 {
 				continue
 			}
 
-			switch ext {
-			case ".json":
-				if err := jsoniter.Unmarshal(data, n.config); err != nil {
-					errs = errors.Append(errs, err)
+			// loop
+			for _, config := range n.configs {
+				switch ext {
+				case ".json":
+					if err := jsoniter.Unmarshal(data, config); err != nil {
+						errs = errors.Append(errs, err)
+						continue
+					}
+				case ".yaml", ".yml":
+					if err := yaml.Unmarshal(data, config); err != nil {
+						errs = errors.Append(errs, err)
+						continue
+					}
+				default:
+					errs = errors.Append(errs, fmt.Errorf("unsupported config file extension: %s", ext))
 					continue
 				}
-			case ".yaml", ".yml":
-				if err := yaml.Unmarshal(data, n.config); err != nil {
-					errs = errors.Append(errs, err)
-					continue
-				}
-			default:
-				errs = errors.Append(errs, fmt.Errorf("unsupported config file extension: %s", ext))
-				continue
-			}
 
-			// update
-			if inter, ok := n.config.(Config); ok {
-				if err := inter.Update(); err != nil {
-					errs = errors.Append(errs, err)
+				// update
+				if inter, ok := config.(Config); ok {
+					if err := inter.Update(); err != nil {
+						errs = errors.Append(errs, err)
+					}
 				}
 			}
 
 			// exec callbacks
 			for i := 0; i < len(n.callbacks); i++ {
-				if err := n.callbacks[i].Callback(n.config); err != nil {
+				if err := n.callbacks[i].Callback(); err != nil {
 					errs = errors.Append(errs, err)
 				}
 			}
-
 		}
 	}
+
 	return
 }
 
@@ -200,8 +203,10 @@ func (r *Registry) UnmarshalYAML(unmarshal func(interface{}) error) (errs error)
 	// range
 	for e := r.l.Front(); e != nil; e = e.Next() {
 		if n, ok := e.Value.(*node); ok {
-			if err := unmarshal(n.config); err != nil {
-				errs = errors.Append(errs, err)
+			for _, config := range n.configs {
+				if err := unmarshal(config); err != nil {
+					errs = errors.Append(errs, err)
+				}
 			}
 		}
 	}
@@ -214,8 +219,10 @@ func (r *Registry) UnmarshalJSON(data []byte) (errs error) {
 	// range
 	for e := r.l.Front(); e != nil; e = e.Next() {
 		if n, ok := e.Value.(*node); ok {
-			if err := jsoniter.Unmarshal(data, n.config); err != nil {
-				errs = errors.Append(errs, err)
+			for _, config := range n.configs {
+				if err := jsoniter.Unmarshal(data, config); err != nil {
+					errs = errors.Append(errs, err)
+				}
 			}
 		}
 	}
@@ -247,7 +254,7 @@ func RegisterAfter(name string, config interface{}, after string) {
 }
 
 // Get config with key, when not exist return nil.
-func Get(name string) interface{} {
+func Get(name string) []interface{} {
 	return defaultRegistry.Get(name)
 }
 
