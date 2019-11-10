@@ -16,6 +16,15 @@ type Config1 struct {
 	C0     Config0 `json:"c0" yaml:"c0"`
 }
 
+const config = `
+int: 0
+string: c
+
+c0:
+  int: 10
+  string: c0
+`
+
 func TestRegistry(t *testing.T) {
 	c0 := new(Config0)
 	c1 := new(Config1)
@@ -25,13 +34,10 @@ func TestRegistry(t *testing.T) {
 	registry.Register("config0", c0)
 	registry.Register("config1", c1)
 
-	filename := "config.yaml"
-
-	err := registry.ParseFiles(filename)
+	err := registry.ParseData([]byte(config), ".yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
-
 
 	t.Log("config0", c0)
 	t.Log("config1", c1)
